@@ -117,8 +117,19 @@ cron.schedule('0 2 * * *', () => {
 const PORT = process.env.PORT || 5000;
 
 // Запуск сервера на указанном порту
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`🚀 Сервер запущен на порту ${PORT}`);
+    console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`💾 База данных: ${process.env.DATABASE_URL ? 'настроена' : 'НЕ НАСТРОЕНА'}`);
+});
+
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+        console.log('Server closed');
+    });
+});
     console.log(`📊 Используется Prisma ORM с PostgreSQL`);
     console.log(`💾 Автоматические бэкапы настроены (ежедневно в 2:00)`);
     // Тест перезапуска

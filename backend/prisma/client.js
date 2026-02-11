@@ -1,7 +1,16 @@
 const { PrismaClient } = require('@prisma/client');
 
-const prisma = new PrismaClient({
-    log: ['query', 'info', 'warn', 'error'],
-});
+// Lazy initialization - don't connect immediately
+let prisma;
 
-module.exports = prisma;
+function getPrisma() {
+    if (!prisma) {
+        prisma = new PrismaClient({
+            log: ['error', 'warn'],
+        });
+    }
+    return prisma;
+}
+
+// Export getter instead of direct instance
+module.exports = { getPrisma };

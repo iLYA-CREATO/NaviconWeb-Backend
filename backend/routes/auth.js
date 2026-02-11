@@ -12,8 +12,8 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 // Импорт bcrypt для хеширования паролей
 const bcrypt = require('bcryptjs');
-// Импорт Prisma клиента
-const prisma = require('../prisma/client');
+// Импорт Prisma клиента (lazy loading)
+const { getPrisma } = require('../prisma/client');
 
 // Вход в систему
 router.post('/login', async (req, res) => {
@@ -22,7 +22,7 @@ router.post('/login', async (req, res) => {
         const { username, password } = req.body;
 
         // Поиск пользователя в базе данных по username
-        const user = await prisma.user.findUnique({
+        const user = await getPrisma().user.findUnique({
             where: { username },
         });
 
@@ -45,7 +45,7 @@ router.post('/login', async (req, res) => {
         );
 
         // Получаем роль пользователя с permissions
-        const userRole = await prisma.role.findFirst({
+        const userRole = await getPrisma().role.findFirst({
             where: { name: user.role },
         });
 
@@ -74,9 +74,9 @@ router.post('/register', async (req, res) => {
         const { username, password, email } = req.body;
 
         // Проверка существования пользователя с таким же username или email
-        const existingUser = await prisma.user.findFirst({
+        const existingUser = await getPrisma().user.findFirst({
             where: {
-                OR: [{ username }, { email }], // Проверка по username ИЛИ email
+                OR: [{ username }, { email }],
             },
         });
 
@@ -84,8 +84,8 @@ router.post('/register', async (req, res) => {
         if (existingUser) {
             return res.status(400).json({
                 message: existingUser.username === username
-                    ? 'Имя пользователя уже существует' // Конфликт по username
-                    : 'Email уже существует' // Конфликт по email
+                    ? 'Имя пользователя уже существует'
+                    : 'Email уже существует'
             });
         }
 
@@ -93,10 +93,10 @@ router.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Создание нового пользователя в базе данных
-        const newUser = await prisma.user.create({
+        const newUser = await getPrisma().user.create({
             data: {
                 username,
-                password: hashedPassword, // Сохраняем хешированный пароль
+                password: hashedPassword,
                 email,
             },
         });
@@ -131,14 +131,14 @@ router.get('/me', async (req, res) => {
         // Извлечение токена из заголовка Authorization (формат: "Bearer <token>")
         const token = req.headers.authorization?.split(' ')[1];
         if (!token) {
-            return res.status(401).json({ message: 'No token provided' }); // Токен не предоставлен
+            return res.status(401).json({ message: 'No token provided' });
         }
 
         // Верификация и декодирование JWT токена
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         // Поиск пользователя в базе данных по ID из токена
-        const user = await prisma.user.findUnique({
+        const user = await getPrisma().user.findUnique({
             where: { id: decoded.id },
         });
 
@@ -148,7 +148,7 @@ router.get('/me', async (req, res) => {
         }
 
         // Получаем роль пользователя с permissions
-        const userRole = await prisma.role.findFirst({
+        const userRole = await getPrisma().role.findFirst({
             where: { name: user.role },
         });
 
