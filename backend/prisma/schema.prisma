@@ -1,15 +1,11 @@
-// Это файл схемы Prisma,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Ищете способы ускорить запросы или легко масштабировать с serverless или edge функциями?
-// Попробуйте Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Это файл схемы Prisma для MySQL
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -74,7 +70,7 @@ model Bid {
          clientId    Int
          bidTypeId   Int
          tema        String
-         amount      Decimal  @db.Decimal(10, 2)
+         amount      Decimal(10, 2)
          status      String
          description String?
          clientObjectId Int?
@@ -88,8 +84,8 @@ model Bid {
          plannedResolutionDate DateTime?
          plannedReactionTimeMinutes Int?
          assignedAt  DateTime?
-         plannedDurationMinutes Decimal? @db.Decimal(5, 2)
-         spentTimeHours Decimal? @db.Decimal(5, 2)
+         plannedDurationMinutes Decimal(5, 2)
+         spentTimeHours Decimal(5, 2)
          createdBy   Int
          currentResponsibleUserId Int?
          createdAt   DateTime @default(now())
@@ -137,8 +133,8 @@ model Specification {
      categoryId Int
      category   SpecificationCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
      name       String
-     discount   Decimal              @db.Decimal(5, 2)
-     cost       Decimal              @db.Decimal(10, 2)
+     discount   Decimal(5, 2)
+     cost       Decimal(10, 2)
      createdAt  DateTime             @default(now())
      updatedAt  DateTime             @updatedAt
      bidSpecifications BidSpecification[]
@@ -150,10 +146,19 @@ model BidSpecification {
      bid            Bid          @relation(fields: [bidId], references: [id], onDelete: Cascade)
      specificationId Int
      specification  Specification @relation(fields: [specificationId], references: [id], onDelete: Cascade)
-     executorIds    Int[]
-     discount       Decimal      @db.Decimal(5, 2) @default(0)
+     executorIds    String       // JSON array stored as string for MySQL
+     discount       Decimal(5, 2) @default(0)
      createdAt      DateTime     @default(now())
      updatedAt      DateTime     @updatedAt
+}
+
+model BidSpecificationExecutor {
+    id                 Int          @id @default(autoincrement())
+    bidSpecificationId  Int
+    userId             Int
+    createdAt          DateTime     @default(now())
+
+    @@index([bidSpecificationId])
 }
 
 model Supplier {
@@ -168,43 +173,43 @@ model Supplier {
    }
 
 model BidType {
-         id                    Int      @id @default(autoincrement())
-         name                  String   @unique
-         description           String?
-         statuses              Json?
-         transitions           Json?
-         plannedReactionTimeMinutes Int?    // SLA: плановое время реакции в минутах
-         plannedDurationMinutes  Decimal?  @db.Decimal(10, 2)  // SLA: плановая продолжительность в минутах
-         createdAt             DateTime @default(now())
-         updatedAt             DateTime @updatedAt
-         bids                  Bid[]
-     }
+          id                    Int      @id @default(autoincrement())
+          name                  String   @unique
+          description           String?
+          statuses              Json?
+          transitions           Json?
+          plannedReactionTimeMinutes Int?    // SLA: плановое время реакции в минутах
+          plannedDurationMinutes  Decimal(10, 2)  // SLA: плановая продолжительность в минутах
+          createdAt             DateTime @default(now())
+          updatedAt             DateTime @updatedAt
+          bids                  Bid[]
+      }
 
 model AuditLog {
-      id        Int      @id @default(autoincrement())
-      bidId     Int
-      bid       Bid      @relation(fields: [bidId], references: [id], onDelete: Cascade)
-      userId    Int
-      user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-      action    String
-      details   String?
-      createdAt DateTime @default(now())
+       id        Int      @id @default(autoincrement())
+       bidId     Int
+       bid       Bid      @relation(fields: [bidId], references: [id], onDelete: Cascade)
+       userId    Int
+       user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+       action    String
+       details   String?
+       createdAt DateTime @default(now())
 }
 
 model Warehouse {
-      id        Int      @id @default(autoincrement())
-      name      String   @unique
-      address   String?
-      createdAt DateTime @default(now())
-      updatedAt DateTime @updatedAt
+       id        Int      @id @default(autoincrement())
+       name      String   @unique
+       address   String?
+       createdAt DateTime @default(now())
+       updatedAt DateTime @updatedAt
 }
 
 model Equipment {
        id           Int      @id @default(autoincrement())
        name         String   @unique
        productCode  Int?     @unique
-       purchasePrice Decimal? @db.Decimal(10, 2)
-       sellingPrice  Decimal? @db.Decimal(10, 2)
+       purchasePrice Decimal(10, 2)
+       sellingPrice  Decimal(10, 2)
        createdAt    DateTime @default(now())
        updatedAt    DateTime @updatedAt
        clientObjects ClientObject[]
@@ -213,79 +218,79 @@ model Equipment {
    }
 
 model BidEquipment {
-      id          Int      @id @default(autoincrement())
-      bidId       Int
-      bid         Bid      @relation(fields: [bidId], references: [id], onDelete: Cascade)
-      equipmentId Int
-      equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
-      imei        String?
-      quantity    Int      @default(1)
-      returnReason String?
-      createdAt   DateTime @default(now())
-      updatedAt   DateTime @updatedAt
-}
-
-model ClientEquipment {
-      id          Int      @id @default(autoincrement())
-      clientId    Int
-      client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-      equipmentId Int
-      equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
-      bidId       Int?
-      bid         Bid?     @relation(fields: [bidId], references: [id])
-      imei        String?
-      createdAt   DateTime @default(now())
-      updatedAt   DateTime @updatedAt
-
-      @@unique([clientId, equipmentId])
-}
-
-model ClientAttribute {
-      id          Int      @id @default(autoincrement())
-      name        String
-      type        String
-      options     Json?
-      isEnabled   Boolean  @default(true)
-      createdAt   DateTime @default(now())
-      updatedAt   DateTime @updatedAt
-      values      ClientAttributeValue[]
-}
-
-model ClientAttributeValue {
-      id          Int      @id @default(autoincrement())
-      clientId    Int
-      client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-      attributeId Int
-      attribute   ClientAttribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
-      value       String
-      createdAt   DateTime @default(now())
-      updatedAt   DateTime @updatedAt
-
-      @@unique([clientId, attributeId])
-}
-
-model Notification {
-       id          Int      @id @default(autoincrement())
-       userId      Int
-       title       String
-       message     String
-       type        String
-       bidId       Int?
-       isRead      Boolean  @default(false)
-       createdAt   DateTime @default(now())
-}
-
-model BidFile {
        id          Int      @id @default(autoincrement())
        bidId       Int
        bid         Bid      @relation(fields: [bidId], references: [id], onDelete: Cascade)
-       filename    String
-       originalName String
-       fileSize    Int
-       mimeType    String?
-       uploadedBy  Int
-       user        User     @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+       equipmentId Int
+       equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+       imei        String?
+       quantity    Int      @default(1)
+       returnReason String?
        createdAt   DateTime @default(now())
+       updatedAt   DateTime @updatedAt
+}
 
-       @@index([bidId])
+model ClientEquipment {
+       id          Int      @id @default(autoincrement())
+       clientId    Int
+       client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+       equipmentId Int
+       equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+       bidId       Int?
+       bid         Bid?     @relation(fields: [bidId], references: [id])
+       imei        String?
+       createdAt   DateTime @default(now())
+       updatedAt   DateTime @updatedAt
+
+       @@unique([clientId, equipmentId])
+}
+
+model ClientAttribute {
+       id          Int      @id @default(autoincrement())
+       name        String
+       type        String
+       options     Json?
+       isEnabled   Boolean  @default(true)
+       createdAt   DateTime @default(now())
+       updatedAt   DateTime @updatedAt
+       values      ClientAttributeValue[]
+}
+
+model ClientAttributeValue {
+       id          Int      @id @default(autoincrement())
+       clientId    Int
+       client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+       attributeId Int
+       attribute   ClientAttribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+       value       String
+       createdAt   DateTime @default(now())
+       updatedAt   DateTime @updatedAt
+
+       @@unique([clientId, attributeId])
+}
+
+model Notification {
+        id          Int      @id @default(autoincrement())
+        userId      Int
+        title       String
+        message     String
+        type        String
+        bidId       Int?
+        isRead      Boolean  @default(false)
+        createdAt   DateTime @default(now())
+}
+
+model BidFile {
+        id          Int      @id @default(autoincrement())
+        bidId       Int
+        bid         Bid      @relation(fields: [bidId], references: [id], onDelete: Cascade)
+        filename    String
+        originalName String
+        fileSize    Int
+        mimeType    String?
+        uploadedBy  Int
+        user        User     @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+        createdAt   DateTime @default(now())
+
+        @@index([bidId])
 }

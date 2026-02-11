@@ -28,6 +28,7 @@ router.get('/report', authenticateToken, async (req, res) => {
     try {
         const { userId, startDate, endDate } = req.query;
 
+        // Parse executorIds from JSON string (MySQL)
         let whereClause = {
             createdAt: {
                 gte: new Date(startDate),
@@ -35,10 +36,7 @@ router.get('/report', authenticateToken, async (req, res) => {
             },
         };
 
-        if (userId && userId !== 'all') {
-            whereClause.executorIds = { has: parseInt(userId) };
-        }
-
+        // For MySQL, we need to filter manually since JSON contains arrays
         const bidSpecifications = await prisma.bidSpecification.findMany({
             where: whereClause,
             include: {
@@ -60,14 +58,33 @@ router.get('/report', authenticateToken, async (req, res) => {
             },
         });
 
+        // Filter by userId if specified (since executorIds is JSON in MySQL)
+        let filteredSpecs = bidSpecifications;
+        if (userId && userId !== 'all') {
+            const targetUserId = parseInt(userId);
+            filteredSpecs = bidSpecifications.filter(spec => {
+                try {
+                    const executorIds = JSON.parse(spec.executorIds || '[]');
+                    return executorIds.includes(targetUserId);
+                } catch (e) {
+                    return false;
+                }
+            });
+        }
+
         // Fetch executors for each spec
-        const specsWithExecutors = await Promise.all(bidSpecifications.map(async (spec) => {
+        const specsWithExecutors = await Promise.all(filteredSpecs.map(async (spec) => {
             let executors = [];
-            if (spec.executorIds.length > 0) {
-                executors = await prisma.user.findMany({
-                    where: { id: { in: spec.executorIds } },
-                    select: { id: true, fullName: true, username: true },
-                });
+            try {
+                const executorIds = JSON.parse(spec.executorIds || '[]');
+                if (executorIds.length > 0) {
+                    executors = await prisma.user.findMany({
+                        where: { id: { in: executorIds } },
+                        select: { id: true, fullName: true, username: true },
+                    });
+                }
+            } catch (e) {
+                console.error('Error parsing executorIds:', e);
             }
             return { ...spec, executors };
         }));

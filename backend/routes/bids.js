@@ -305,8 +305,14 @@ router.get('/:id', authMiddleware, async (req, res) => {
             },
         });
 
-        // Получаем всех исполнителей из спецификаций
-        const allExecutorIds = specifications.flatMap(spec => spec.executorIds);
+        // Получаем всех исполнителей из спецификаций (MySQL: JSON parse)
+        const allExecutorIds = specifications.flatMap(spec => {
+            try {
+                return JSON.parse(spec.executorIds || '[]');
+            } catch (e) {
+                return [];
+            }
+        });
         const uniqueExecutorIds = [...new Set(allExecutorIds)];
 
         let executors = [];
@@ -1007,15 +1013,20 @@ router.get('/:id/specifications', authMiddleware, async (req, res) => {
             },
         });
 
-        // Создаем карту исполнителей
+        // Создаем карту исполнителей (MySQL: JSON parse)
         const executorsMap = {};
         for (const spec of executorsData) {
-            if (spec.executorIds.length > 0) {
-                const executors = await prisma.user.findMany({
-                    where: { id: { in: spec.executorIds } },
-                    select: { id: true, fullName: true },
-                });
-                executorsMap[spec.id] = executors;
+            try {
+                const executorIdsArr = JSON.parse(spec.executorIds || '[]');
+                if (executorIdsArr.length > 0) {
+                    const executors = await prisma.user.findMany({
+                        where: { id: { in: executorIdsArr } },
+                        select: { id: true, fullName: true },
+                    });
+                    executorsMap[spec.id] = executors;
+                }
+            } catch (e) {
+                executorsMap[spec.id] = [];
             }
         }
 
@@ -1071,17 +1082,20 @@ router.post('/:id/specifications', authMiddleware, async (req, res) => {
             }
         }
 
-        // Создаем спецификацию заявки
+        // Создаем спецификацию заявки (MySQL: JSON stringify for executorIds)
         const discountValue = discount !== undefined ? parseFloat(discount) : 0;
-        const bidSpecification = await prisma.$queryRaw`
-            INSERT INTO "BidSpecification" ("bidId", "specificationId", "executorIds", "discount", "createdAt", "updatedAt")
-            VALUES (${bidId}, ${parseInt(specificationId)}, ${executorIds ? executorIds.map(id => parseInt(id)) : []}, ${discountValue}, NOW(), NOW())
-            RETURNING *
-        `;
+        const bidSpecification = await prisma.bidSpecification.create({
+            data: {
+                bidId: bidId,
+                specificationId: parseInt(specificationId),
+                executorIds: executorIds ? JSON.stringify(executorIds.map(id => parseInt(id))) : '[]',
+                discount: discountValue,
+            },
+        });
 
         // Получаем спецификацию с связанными данными
         const specWithDetails = await prisma.bidSpecification.findUnique({
-            where: { id: bidSpecification[0].id },
+            where: { id: bidSpecification.id },
             include: {
                 specification: {
                     include: {
@@ -1091,18 +1105,21 @@ router.post('/:id/specifications', authMiddleware, async (req, res) => {
             },
         });
 
-        // Получаем исполнителей
+        // Получаем исполнителей (MySQL: JSON parse)
         let executors = [];
-        if (specWithDetails.executorIds.length > 0) {
-            executors = await prisma.user.findMany({
-                where: { id: { in: specWithDetails.executorIds } },
-                select: { id: true, fullName: true },
-            });
-        }
+        try {
+            const executorIdsArr = JSON.parse(specWithDetails.executorIds || '[]');
+            if (executorIdsArr.length > 0) {
+                executors = await prisma.user.findMany({
+                    where: { id: { in: executorIdsArr } },
+                    select: { id: true, fullName: true },
+                });
+            }
+        } catch (e) {}
 
         res.status(201).json({
             ...specWithDetails,
-            discount: bidSpecification[0].discount,
+            discount: bidSpecification.discount,
             executors,
         });
     } catch (error) {
@@ -1137,19 +1154,14 @@ router.put('/:id/specifications/:specId', authMiddleware, async (req, res) => {
             }
         }
 
-        // Обновляем спецификацию
+        // Обновляем спецификацию (MySQL: JSON stringify for executorIds)
         const discountValue = discount !== undefined ? parseFloat(discount) : existingSpec.discount;
-        await prisma.$executeRaw`
-            UPDATE "BidSpecification"
-            SET "executorIds" = ${executorIds ? executorIds.map(id => parseInt(id)) : []},
-                "discount" = ${discountValue},
-                "updatedAt" = NOW()
-            WHERE "id" = ${specId}
-        `;
-
-        // Получаем обновленную спецификацию
-        const updatedSpec = await prisma.bidSpecification.findUnique({
+        const updatedSpec = await prisma.bidSpecification.update({
             where: { id: specId },
+            data: {
+                executorIds: executorIds ? JSON.stringify(executorIds.map(id => parseInt(id))) : '[]',
+                discount: discountValue,
+            },
             include: {
                 specification: {
                     include: {
@@ -1159,14 +1171,17 @@ router.put('/:id/specifications/:specId', authMiddleware, async (req, res) => {
             },
         });
 
-        // Получаем исполнителей
+        // Получаем исполнителей (MySQL: JSON parse)
         let executors = [];
-        if (updatedSpec.executorIds.length > 0) {
-            executors = await prisma.user.findMany({
-                where: { id: { in: updatedSpec.executorIds } },
-                select: { id: true, fullName: true },
-            });
-        }
+        try {
+            const executorIdsArr = JSON.parse(updatedSpec.executorIds || '[]');
+            if (executorIdsArr.length > 0) {
+                executors = await prisma.user.findMany({
+                    where: { id: { in: executorIdsArr } },
+                    select: { id: true, fullName: true },
+                });
+            }
+        } catch (e) {}
 
         res.json({
             ...updatedSpec,
