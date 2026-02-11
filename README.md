@@ -2,6 +2,47 @@
 
 CRM система с frontend (React) и backend (Node.js + Express + Prisma).
 
+## Развёртывание на Railway
+
+### Шаг 1: Подключение репозитория
+1. Создайте аккаунт на [Railway.app](https://railway.app)
+2. Нажмите "New Project" → "Deploy from GitHub"
+3. Выберите ваш репозиторий
+
+### Шаг 2: Настройка переменных окружения
+В Railway dashboard перейдите в "Variables" и добавьте:
+
+| Переменная | Значение |
+|------------|----------|
+| `DATABASE_URL` | MySQL connection string от reg.ru |
+| `JWT_SECRET` | Случайная строка (минимум 32 символа) |
+| `FRONTEND_URL` | URL вашего frontend (например, https://your-site.ru) |
+
+### Шаг 3: Получение API URL бэкенда
+После успешного деплоя:
+
+1. В Railway dashboard перейдите в ваш проект
+2. Нажмите на сервис (Service) → "Settings"
+3. Найдите секцию "Networking" или "Domains"
+4. Скопируйте ваш URL:
+   - Формат: `https://your-service-name.up.railway.app`
+   - Или кастомный домен, если настроили
+
+### Шаг 4: Подключение фронтенда
+В frontend коде используйте API:
+
+```javascript
+// В config или .env файле фронтенда
+const API_URL = 'https://your-backend-service.up.railway.app/api';
+
+// Пример запроса
+fetch(`${API_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+});
+```
+
 ## Управление сервером
 
 ### Универсальный скрипт (рекомендуется)
