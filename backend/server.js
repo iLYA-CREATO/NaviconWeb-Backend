@@ -42,8 +42,12 @@ const fs = require('fs');
 const app = express();
 
 // === Middleware ===
-// Разрешение CORS для всех доменов (в продакшене лучше настроить конкретные домены)
-app.use(cors());
+// Настройка CORS для разрешения запросов с фронтенда
+const corsOptions = {
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    credentials: true
+};
+app.use(cors(corsOptions));
 // Парсинг JSON тела запросов (увеличен лимит для bulk операций)
 app.use(express.json({ limit: '50mb' }));
 // Парсинг URL-encoded данных (для форм)
